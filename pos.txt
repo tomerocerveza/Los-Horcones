@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Los Horcones POS</title>
+<style>
+:root{--bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a25;--border:#2a2a3a;--text:#e8e8f0;--textMuted:#8888a0;--amber:#f59e0b;--amberDark:#d97706;--green:#22c55e;--red:#ef4444;--blue:#3b82f6;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+*{margin:0;padding:0;box-sizing:border-box;font-family:var(--font)}
+body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;padding-bottom:60px}
+.screen{display:none;padding:14px;animation:fadeIn .2s}.screen.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+h2{font-size:18px;margin-bottom:12px;color:var(--amber)}
+.form-group{margin-bottom:10px}
+.form-group label{display:block;font-size:11px;color:var(--textMuted);margin-bottom:3px;font-weight:600}
+input,select{width:100%;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px}
+input:focus,select:focus{outline:none;border-color:var(--amber)}
+input[readonly]{background:var(--surface);color:var(--amberDark)}
+.btn{width:100%;padding:12px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px}
+.btn-amber{background:var(--amber);color:#000}
+.btn-green{background:var(--green);color:#fff}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn:active{transform:scale(.98)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px}
+.item-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)}
+.item-row:last-child{border-bottom:none}
+.item-row .name{font-weight:600;font-size:12px}
+.item-row .detail{font-size:10px;color:var(--textMuted)}
+.item-row .price{color:var(--amber);font-weight:700}
+.item-row .remove{color:var(--red);cursor:pointer;font-weight:bold;margin-left:6px}
+.total-row{display:flex;justify-content:space-between;padding:10px 0;font-size:18px;font-weight:700;color:var(--amber)}
+.nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 4px;z-index:100}
+.nav-btn{background:none;border:none;color:var(--textMuted);font-size:10px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+.nav-btn.active{color:var(--amber)}
+.nav-btn span{font-size:18px}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-100px);background:var(--green);color:#fff;padding:10px 16px;border-radius:8px;font-size:12px;font-weight:600;transition:transform .3s;z-index:999}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.empty{text-align:center;padding:40px 20px;color:var(--textMuted)}
+.badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:600;background:rgba(245,158,11,.2);color:var(--amber)}
+.badge.low{background:rgba(239,68,68,.2);color:var(--red)}
+</style>
+</head>
+<body>
+
+<!-- SCREENS -->
+<div id="pos" class="screen active">
+  <h2>🍺 Punto de Venta</h2>
+  <div class="form-group">
+    <label>👤 Cliente</label>
+    <select id="selCliente"></select>
+  </div>
+  <div class="form-group">
+    <label>🍺 Producto</label>
+    <select id="selProducto"><option value="">Cargando productos...</option></select>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <div class="form-group" style="flex:1"><label>📦 Cantidad</label><input type="number" id="txtCant" value="1" min="1"></div>
+    <div class="form-group" style="flex:1"><label>💰 Precio</label><input type="text" id="txtPrecio" readonly placeholder="Auto"></div>
+  </div>
+  <button class="btn btn-green" onclick="addToCart()">+ Agregar al Carrito</button>
+
+  <div id="cartView" style="display:none;margin-top:14px">
+    <h3 style="font-size:14px;margin-bottom:6px">🛒 Carrito</h3>
+    <div id="cartItems"></div>
+    <div class="total-row"><span>Total</span><span id="cartTotal">$0</span></div>
+  </div>
+
+  <div class="form-group" style="margin-top:12px">
+    <label>💳 Forma de Pago</label>
+    <select id="selPago">
+      <option value="">Seleccionar método...</option>
+      <option value="Efectivo">💵 Efectivo</option>
+      <option value="Transferencia">🏦 Transferencia</option>
+      <option value="Débito">💳 Débito</option>
+      <option value="Crédito">💳 Crédito</option>
+      <option value="Cuenta Corriente">📋 Cuenta Corriente</option>
+    </select>
+  </div>
+  <button class="btn btn-amber" onclick="checkout()">💰 COBRAR</button>
+</div>
+
+<div id="clientes" class="screen">
+  <h2>👥 Clientes</h2>
+  <button class="btn btn-outline" onclick="showClientForm()">+ Nuevo Cliente</button>
+  <div id="clientForm" style="display:none;margin:10px 0">
+    <div class="card">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="cliNom" placeholder="Nombre*" style="flex:2">
+        <input id="cliApe" placeholder="Apellido" style="flex:1">
+      </div>
+      <input id="cliNeg" placeholder="Negocio" style="margin-bottom:8px">
+      <input id="cliTel" placeholder="Teléfono WhatsApp*" type="tel" style="margin-bottom:8px">
+      <input id="cliDir" placeholder="Dirección" style="margin-bottom:8px">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="cliCUIT" placeholder="CUIT" style="flex:1">
+        <select id="cliTipo" style="flex:1">
+          <option>Bar</option><option>Restaurante</option><option>Vinoteca</option><option>Almacén</option><option>Particular</option>
+        </select>
+      </div>
+      <input id="cliNotas" placeholder="Notas internas" style="margin-bottom:8px">
+      <button class="btn btn-green" onclick="saveClient()">💾 Guardar</button>
+      <button class="btn btn-outline" onclick="hideClientForm()">Cancelar</button>
+    </div>
+  </div>
+  <div id="clientsList"></div>
+</div>
+
+<div id="historial" class="screen">
+  <h2>📊 Historial de Ventas</h2>
+  <div id="histList"></div>
+</div>
+
+<div id="productos" class="screen">
+  <h2>📦 Productos</h2>
+  <button class="btn btn-outline" onclick="showProdForm()">+ Nuevo Producto</button>
+  <div id="prodForm" style="display:none;margin:10px 0">
+    <div class="card">
+      <input id="prodNom" placeholder="Nombre*" style="margin-bottom:8px">
+      <input id="prodEst" placeholder="Estilo" style="margin-bottom:8px">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="prodPre" placeholder="Precio $" type="number" style="flex:1">
+        <input id="prodSto" placeholder="Stock" type="number" style="flex:1">
+      </div>
+      <button class="btn btn-green" onclick="saveProduct()">💾 Guardar</button>
+      <button class="btn btn-outline" onclick="hideProdForm()">Cancelar</button>
+    </div>
+  </div>
+  <div id="prodList"></div>
+</div>
+
+<div id="resumen" class="screen">
+  <h2>📈 Resumen</h2>
+  <div id="ticketView"></div>
+  <button class="btn btn-blue" style="margin:10px 0" onclick="sendTicket('cliente')">📱 Enviar al Cliente</button>
+  <button class="btn btn-outline" onclick="sendTicket('interno')">📋 Enviar a mi Número</button>
+  <button class="btn btn-green" style="margin-top:10px" onclick="newSale()">🍺 Nueva Venta</button>
+</div>
+
+<!-- NAV -->
+<nav class="nav">
+  <button class="nav-btn active" onclick="nav('pos')"><span>🍺</span>POS</button>
+  <button class="nav-btn" onclick="nav('clientes')"><span>👥</span>Clientes</button>
+  <button class="nav-btn" onclick="nav('historial')"><span>📊</span>Historial</button>
+  <button class="nav-btn" onclick="nav('productos')"><span>📦</span>Productos</button>
+  <button class="nav-btn" onclick="nav('resumen')"><span>📈</span>Resumen</button>
+</nav>
+
+<div class="toast" id="toast">✅ Acción completada</div>
+
+<script>
+// === CONFIGURACIÓN ===
+const API_URL = 'https://script.google.com/macros/s/AKfycbzNY5A4Rls24akHueBkWLU7VFZ6DcFIkCJETe4Rdx13UUU47BYKF9yQ07fKctBXQUoF/exec';
+let carrito = JSON.parse(localStorage.getItem('lh_cart') || '[]');
+let pendingSales = JSON.parse(localStorage.getItem('lh_pending') || '[]');
+let productos = [];
+let clientes = JSON.parse(localStorage.getItem('lh_clients') || '[]');
+let ventaActual = null;
+
+// === INIT ===
+async function init(){
+  renderCart();
+  renderPending();
+  await loadProductos();
+  await loadClientes();
+  if(navigator.onLine) syncPending();
+  window.addEventListener('online', syncPending);
+  
+  // Service Worker & PWA
+  if('serviceWorker' in navigator){
+    const sw = `self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>new Response('Offline'))));`;
+    const blob = new Blob([sw],{type:'application/javascript'});
+    navigator.serviceWorker.register(URL.createObjectURL(blob));
+  }
+}
+
+// === API ===
+async function callAPI(accion, params={}){
+  const url = new URL(API_URL);
+  url.searchParams.set('accion', accion);
+  Object.entries(params).forEach(([k,v])=>url.searchParams.set(k, v));
+  const res = await fetch(url.toString());
+  if(!res.ok) throw new Error('Error de red');
+  const data = await res.json();
+  if(!data.success) throw new Error(data.error);
+  return data;
+}
+
+async function loadProductos(){
+  try{
+    const res = await callAPI('getProductos');
+    productos = res.productos || [];
+    renderProductos();
+    updateProductSelect();
+  }catch(e){ console.warn('Productos offline'); }
+}
+
+async function loadClientes(){
+  try{
+    const res = await callAPI('getClientes');
+    clientes = res.clientes || clientes;
+    localStorage.setItem('lh_clients', JSON.stringify(clientes));
+    renderClientes();
+    updateClientSelect();
+  }catch(e){ updateClientSelect(); }
+}
+
+// === POS ===
+function updateProductSelect(){
+  const sel = document.getElementById('selProducto');
+  sel.innerHTML = '<option value="">Seleccionar producto...</option>' + 
+    productos.map(p=>`<option value="${p.nombre}" data-precio="${p.precioBotella}" data-stock="${p.stock}">${p.nombre} ($${p.precioBotella}) [${p.stock}]</option>`).join('');
+  sel.onchange = ()=>{
+    const opt = sel.options[sel.selectedIndex];
+    document.getElementById('txtPrecio').value = opt.dataset.precio || '';
+  };
+}
+
+function updateClientSelect(){
+  const sel = document.getElementById('selCliente');
+  sel.innerHTML = '<option value="Mostrador">🏪 Mostrador (sin cliente)</option>' +
+    clientes.map(c=>`<option value="${c.negocio||''} - ${c.nombre} ${c.apellido}">${c.negocio||''} - ${c.nombre} ${c.apellido}</option>`).join('');
+}
+
+function addToCart(){
+  const prod = document.getElementById('selProducto').value;
+  if(!prod) return toast('⚠️ Selecciona un producto');
+  const cant = parseInt(document.getElementById('txtCant').value)||1;
+  const precio = parseInt(document.getElementById('txtPrecio').value)||0;
+  const item = carrito.find(i=>i.nombre===prod);
+  if(item) item.cantidad += cant;
+  else carrito.push({nombre:prod, precio, cantidad:cant});
+  saveCart(); renderCart();
+  document.getElementById('txtCant').value = 1;
+  document.getElementById('selProducto').value = '';
+  document.getElementById('txtPrecio').value = '';
+  toast('✅ Agregado');
+}
+
+function renderCart(){
+  const view = document.getElementById('cartView');
+  const container = document.getElementById('cartItems');
+  if(carrito.length===0){view.style.display='none';return;}
+  view.style.display='block';
+  let total=0, html='';
+  carrito.forEach((c,i)=>{
+    const sub = c.precio*c.cantidad; total+=sub;
+    html+=`<div class="item-row"><div><span class="name">${c.nombre}</span><br><span class="detail">x${c.cantidad} × $${c.precio}</span></div><div><span class="price">$${sub}</span><span class="remove" onclick="removeFromCart(${i})">✕</span></div></div>`;
+  });
+  container.innerHTML=html;
+  document.getElementById('cartTotal').textContent='$'+total;
+}
+
+function removeFromCart(i){carrito.splice(i,1);saveCart();renderCart();}
+function saveCart(){localStorage.setItem('lh_cart',JSON.stringify(carrito));}
+
+function checkout(){
+  if(carrito.length===0) return toast('⚠️ Carrito vacío');
+  const pago = document.getElementById('selPago').value;
+  if(!pago) return toast('⚠️ Selecciona forma de pago');
+  const cliente = document.getElementById('selCliente').value || 'Mostrador';
+  const total = carrito.reduce((s,c)=>s+c.precio*c.cantidad,0);
+  
+  ventaActual = {fecha:new Date().toLocaleString('es-AR'), cliente, carrito:[...carrito], total, pago};
+  guardarVentaOffline(ventaActual);
+  renderResumen(ventaActual);
+  nav('resumen');
+  carrito=[]; saveCart(); renderCart();
+  document.getElementById('selPago').value='';
+  toast('✅ Venta registrada');
+}
+
+function guardarVentaOffline(venta){
+  pendingSales.push({...venta, status:'pending', timestamp:Date.now()});
+  localStorage.setItem('lh_pending', JSON.stringify(pendingSales));
+  syncPending();
+}
+
+async function syncPending(){
+  if(!navigator.onLine || pendingSales.length===0) return;
+  toast('🔄 Sincronizando ventas offline...');
+  const toSync = [...pendingSales];
+  pendingSales = [];
+  localStorage.setItem('lh_pending', JSON.stringify(pendingSales));
+  
+  for(const v of toSync){
+    try{
+      const params = {
+        productos: v.carrito.map(c=>c.nombre).join('|'),
+        precios: v.carrito.map(c=>c.precio).join('|'),
+        cantidades: v.carrito.map(c=>c.cantidad).join('|'),
+        cliente: v.cliente,
+        pago: v.pago
+      };
+      await callAPI('guardarVenta', params);
+      
+      // Actualizar stocks
+      await callAPI('actualizarStocks', {
+        nombres: params.productos,
+        cantidades: params.cantidades
+      });
+    }catch(e){
+      pendingSales.push({...v, status:'error'});
+    }
+  }
+  localStorage.setItem('lh_pending', JSON.stringify(pendingSales));
+  toast('✅ Sincronización completa');
+}
+
+// === CLIENTES ===
+function showClientForm(){document.getElementById('clientForm').style.display='block';}
+function hideClientForm(){document.getElementById('clientForm').style.display='none';}
+async function saveClient(){
+  const nom=document.getElementById('cliNom').value.trim();
+  const tel=document.getElementById('cliTel').value.trim();
+  if(!nom||!tel) return toast('⚠️ Nombre y teléfono son obligatorios');
+  const cli = {
+    id:'C'+Date.now(), nombre:nom, apellido:document.getElementById('cliApe').value.trim(),
+    negocio:document.getElementById('cliNeg').value.trim(), tipo:document.getElementById('cliTipo').value,
+    telefono:tel, direccion:document.getElementById('cliDir').value.trim(),
+    cuit:document.getElementById('cliCUIT').value.trim(), notas:document.getElementById('cliNotas').value.trim()
+  };
+  try{ await callAPI('guardarCliente', cli); }catch(e){}
+  clientes.push(cli); localStorage.setItem('lh_clients',JSON.stringify(clientes));
+  renderClientes(); updateClientSelect(); hideClientForm(); toast('✅ Cliente guardado');
+  ['cliNom','cliApe','cliNeg','cliTel','cliDir','cliCUIT','cliNotas'].forEach(id=>document.getElementById(id).value='');
+}
+
+function renderClientes(){
+  document.getElementById('clientsList').innerHTML = clientes.map(c=>`
+    <div class="card">
+      <div style="display:flex;justify-content:space-between"><span class="name">${c.nombre} ${c.apellido}</span><span class="badge">${c.tipo}</span></div>
+      <div class="detail">${c.negocio||'Sin negocio'} | 📞 ${c.telefono}</div>
+      <div class="detail">📍 ${c.direccion||'Sin dirección'} | 🆔 ${c.cuit||'Sin CUIT'}</div>
+      ${c.notas?`<div class="detail">📝 ${c.notas}</div>`:''}
+    </div>`).join('');
+}
+
+// === HISTORIAL ===
+async function renderHistorial(){
+  document.getElementById('histList').innerHTML = '<div class="empty">Cargando...</div>';
+  try{
+    const res = await callAPI('getVentas');
+    document.getElementById('histList').innerHTML = res.ventas.map(v=>`
+      <div class="card">
+        <div style="display:flex;justify-content:space-between"><span class="name">${v.fecha}</span><span class="price">$${v.total}</span></div>
+        <div class="detail">👤 ${v.cliente} | 💳 ${v.pago}</div>
+        <div class="detail">${v.producto} x${v.cantidad}</div>
+      </div>`).join('');
+  }catch(e){ document.getElementById('histList').innerHTML = '<div class="empty">No se pudo cargar. Verifica conexión.</div>'; }
+}
+
+// === PRODUCTOS ===
+function showProdForm(){document.getElementById('prodForm').style.display='block';}
+function hideProdForm(){document.getElementById('prodForm').style.display='none';}
+async function saveProduct(){
+  const nom=document.getElementById('prodNom').value.trim();
+  const pre=parseInt(document.getElementById('prodPre').value);
+  const sto=parseInt(document.getElementById('prodSto').value);
+  if(!nom||isNaN(pre)||isNaN(sto)) return toast('⚠️ Completá nombre, precio y stock');
+  try{
+    await callAPI('guardarProducto', {nombre:nom, estilo:document.getElementById('prodEst').value.trim(), precioBotella:pre, precioPack:pre*6, stock:sto});
+    await loadProductos(); hideProdForm(); toast('✅ Producto guardado');
+  }catch(e){toast('❌ Error al guardar');}
+  ['prodNom','prodEst','prodPre','prodSto'].forEach(id=>document.getElementById(id).value='');
+}
+
+function renderProductos(){
+  document.getElementById('prodList').innerHTML = productos.map(p=>`
+    <div class="item-row">
+      <div><span class="name">${p.nombre}</span><br><span class="detail">${p.estilo||''}</span></div>
+      <div style="text-align:right"><span class="price">$${p.precioBotella}</span><br><span class="badge ${p.stock<=5?'low':''}">Stock: ${p.stock}</span></div>
+    </div>`).join('');
+}
+
+// === RESUMEN ===
+function renderResumen(v){
+  document.getElementById('ticketView').innerHTML = `
+    <div class="card" style="font-size:12px;line-height:1.5;white-space:pre-wrap">
+🍺 *LOS HORCONES - CERVEZAS CUYANAS*
+Las Heras, Mendoza
+
+📋 RESUMEN DE VENTA
+──────────────────
+👤 ${v.cliente}
+Fecha: ${v.fecha}
+──────────────────
+${v.carrito.map(c=>`${c.nombre} x${c.cantidad} - $${c.precio}`).join('\n')}
+
+TOTAL: $ ${v.total}
+Pago: ${v.pago}
+
+*¡¡CONFIRME SI SU PEDIDO ES CORRECTO!!*
+¡Gracias por elegirnos! 🍻
+    </div>`;
+}
+
+function sendTicket(tipo){
+  const msg = document.getElementById('ticketView').innerText;
+  const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+  window.open(url,'_blank');
+}
+
+function newSale(){
+  ventaActual=null;
+  document.getElementById('ticketView').innerHTML='<div class="empty">Nueva venta lista</div>';
+  nav('pos');
+}
+
+// === UI ===
+function nav(screen){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(screen).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  if(screen==='historial') renderHistorial();
+  if(screen==='resumen' && ventaActual) renderResumen(ventaActual);
+}
+
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// === PWA MANIFEST ===
+const manifest = {name:"Los Horcones POS",short_name:"LosHorcones",start_url:".",display:"standalone",background_color:"#0a0a0f",theme_color:"#f59e0b",icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍺</text></svg>",sizes:"any",type:"image/svg+xml"}]};
+const link = document.createElement('link'); link.rel='manifest'; link.href='data:application/json;base64,'+btoa(JSON.stringify(manifest));
+document.head.appendChild(link);
+
+init();
+</script>
+</body>
+</html>
