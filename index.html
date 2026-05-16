@@ -174,36 +174,28 @@ async function init(){
 }
 
 // === API ===
-async function callAPI(accion, params={}){
-  const url = new URL(API_URL);
-  url.searchParams.set('accion', accion);
-  Object.entries(params).forEach(([k,v])=>url.searchParams.set(k, v));
-  const res = await fetch(url.toString());
-  if(!res.ok) throw new Error('Error de red');
-  const data = await res.json();
-  if(!data.success) throw new Error(data.error);
-  return data;
+async function callAPI(accion, params={}) {
+  let url = API_URL.trim();
+  if (url.endsWith('/')) url = url.slice(0, -1);
+  
+  url += `?accion=${encodeURIComponent(accion)}`;
+  for (const [k, v] of Object.entries(params)) {
+    url += `&${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
+  }
+  
+  console.log('🌐 Fetching:', url); // 👈 Mira esto en la consola del navegador
+  
+  const res = await fetch(url);
+  const text = await res.text();
+  try {
+    const data = JSON.parse(text);
+    if (!data.success) throw new Error(data.error || 'Error desconocido');
+    return data;
+  } catch(e) {
+    throw new Error(`Respuesta inválida: ${text}`);
+  }
 }
-
-async function loadProductos(){
-  try{
-    const res = await callAPI('getProductos');
-    productos = res.productos || [];
-    renderProductos();
-    updateProductSelect();
-  }catch(e){ console.warn('Productos offline'); }
-}
-
-async function loadClientes(){
-  try{
-    const res = await callAPI('getClientes');
-    clientes = res.clientes || clientes;
-    localStorage.setItem('lh_clients', JSON.stringify(clientes));
-    renderClientes();
-    updateClientSelect();
-  }catch(e){ updateClientSelect(); }
-}
-
+  
 // === POS ===
 function updateProductSelect(){
   const sel = document.getElementById('selProducto');
