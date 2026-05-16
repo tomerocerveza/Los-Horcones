@@ -413,13 +413,6 @@ function toast(msg){
   setTimeout(()=>t.classList.remove('show'),2500);
 }
 
-// Manifiesto PWA compatible con acentos y emojis
-const manifest = {"name":"Los Horcones POS","short_name":"LosHorcones","start_url":".","display":"standalone","background_color":"#0a0a0f","theme_color":"#f59e0b"};
-const link = document.createElement('link'); 
-link.rel='manifest'; 
-link.href='data:application/json;base64,' + btoa(unescape(encodeURIComponent(JSON.stringify(manifest))));
-document.head.appendChild(link);
-
 init();
 </script>
 </body>
