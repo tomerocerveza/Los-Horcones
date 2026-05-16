@@ -3,11 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Los Horcones POS</title>
 <style>
-:root{--bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a25;--border:#2a2a3a;--text:#e8e8f0;--textMuted:#8888a0;--amber:#f59e0b;--amberDark:#d97706;--green:#22c55e;--red:#ef4444;--blue:#3b82f6;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
-*{margin:0;padding:0;box-sizing:border-box;font-family:var(--font)}
-body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;padding-bottom:60px}
+:root{--bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a25;--border:#2a2a3a;--text:#e8e8f0;--textMuted:#8888a0;--amber:#f59e0b;--amberDark:#d97706;--green:#22c55e;--red:#ef4444;--blue:#3b82f6}
+*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+body{background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:60px}
 .screen{display:none;padding:14px;animation:fadeIn .2s}.screen.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 h2{font-size:18px;margin-bottom:12px;color:var(--amber)}
@@ -17,9 +19,7 @@ input,select{width:100%;padding:10px;background:var(--surface2);border:1px solid
 input:focus,select:focus{outline:none;border-color:var(--amber)}
 input[readonly]{background:var(--surface);color:var(--amberDark)}
 .btn{width:100%;padding:12px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px}
-.btn-amber{background:var(--amber);color:#000}
-.btn-green{background:var(--green);color:#fff}
-.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-amber{background:var(--amber);color:#000}.btn-green{background:var(--green);color:#fff}.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
 .btn:active{transform:scale(.98)}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px}
 .item-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)}
@@ -38,16 +38,32 @@ input[readonly]{background:var(--surface);color:var(--amberDark)}
 .empty{text-align:center;padding:40px 20px;color:var(--textMuted)}
 .badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:600;background:rgba(245,158,11,.2);color:var(--amber)}
 .badge.low{background:rgba(239,68,68,.2);color:var(--red)}
+.error-box{background:rgba(239,68,68,.1);border:1px solid var(--red);border-radius:8px;padding:10px;margin:10px 0;font-size:11px;color:var(--red);white-space:pre-wrap}
+.success-box{background:rgba(34,197,94,.1);border:1px solid var(--green);border-radius:8px;padding:10px;margin:10px 0;font-size:11px;color:var(--green);white-space:pre-wrap}
 </style>
 </head>
 <body>
 
-<!-- SCREENS -->
-<div id="pos" class="screen active">
+<!-- DIAGNÓSTICO (pantalla inicial) -->
+<div id="diagnostico" class="screen active">
+  <h2>🔧 Diagnóstico de Conexión</h2>
+  <div class="form-group">
+    <label>URL de Apps Script</label>
+    <input type="text" id="apiUrlDisplay" readonly style="font-size:10px">
+    <button class="btn btn-outline" onclick="copiarUrl()" style="margin-top:4px;font-size:11px">📋 Copiar URL</button>
+  </div>
+  <button class="btn btn-amber" onclick="testGetProductos()">🧪 Probar getProductos</button>
+  <button class="btn btn-amber" onclick="testGetClientes()" style="margin-top:8px">🧪 Probar getClientes</button>
+  <div id="resultado" style="margin-top:12px"></div>
+  <button class="btn btn-green" onclick="irAPos()" id="btnIrPos" style="margin-top:16px;display:none">➡️ Ir al POS</button>
+</div>
+
+<!-- POS -->
+<div id="pos" class="screen">
   <h2>🍺 Punto de Venta</h2>
   <div class="form-group">
     <label>👤 Cliente</label>
-    <select id="selCliente"></select>
+    <select id="selCliente"><option value="Mostrador">🏪 Mostrador (sin cliente)</option></select>
   </div>
   <div class="form-group">
     <label>🍺 Producto</label>
@@ -58,13 +74,11 @@ input[readonly]{background:var(--surface);color:var(--amberDark)}
     <div class="form-group" style="flex:1"><label>💰 Precio</label><input type="text" id="txtPrecio" readonly placeholder="Auto"></div>
   </div>
   <button class="btn btn-green" onclick="addToCart()">+ Agregar al Carrito</button>
-
   <div id="cartView" style="display:none;margin-top:14px">
     <h3 style="font-size:14px;margin-bottom:6px">🛒 Carrito</h3>
     <div id="cartItems"></div>
     <div class="total-row"><span>Total</span><span id="cartTotal">$0</span></div>
   </div>
-
   <div class="form-group" style="margin-top:12px">
     <label>💳 Forma de Pago</label>
     <select id="selPago">
@@ -79,6 +93,7 @@ input[readonly]{background:var(--surface);color:var(--amberDark)}
   <button class="btn btn-amber" onclick="checkout()">💰 COBRAR</button>
 </div>
 
+<!-- CLIENTES -->
 <div id="clientes" class="screen">
   <h2>👥 Clientes</h2>
   <button class="btn btn-outline" onclick="showClientForm()">+ Nuevo Cliente</button>
@@ -105,29 +120,19 @@ input[readonly]{background:var(--surface);color:var(--amberDark)}
   <div id="clientsList"></div>
 </div>
 
+<!-- HISTORIAL -->
 <div id="historial" class="screen">
   <h2>📊 Historial de Ventas</h2>
   <div id="histList"></div>
 </div>
 
+<!-- PRODUCTOS -->
 <div id="productos" class="screen">
   <h2>📦 Productos</h2>
-  <button class="btn btn-outline" onclick="showProdForm()">+ Nuevo Producto</button>
-  <div id="prodForm" style="display:none;margin:10px 0">
-    <div class="card">
-      <input id="prodNom" placeholder="Nombre*" style="margin-bottom:8px">
-      <input id="prodEst" placeholder="Estilo" style="margin-bottom:8px">
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <input id="prodPre" placeholder="Precio $" type="number" style="flex:1">
-        <input id="prodSto" placeholder="Stock" type="number" style="flex:1">
-      </div>
-      <button class="btn btn-green" onclick="saveProduct()">💾 Guardar</button>
-      <button class="btn btn-outline" onclick="hideProdForm()">Cancelar</button>
-    </div>
-  </div>
   <div id="prodList"></div>
 </div>
 
+<!-- RESUMEN -->
 <div id="resumen" class="screen">
   <h2>📈 Resumen</h2>
   <div id="ticketView"></div>
@@ -138,234 +143,289 @@ input[readonly]{background:var(--surface);color:var(--amberDark)}
 
 <!-- NAV -->
 <nav class="nav">
-  <button class="nav-btn active" onclick="nav('pos')"><span>🍺</span>POS</button>
+  <button class="nav-btn active" onclick="nav('diagnostico')"><span>🔧</span>Diagnóstico</button>
+  <button class="nav-btn" onclick="nav('pos')" id="navPos" disabled><span>🍺</span>POS</button>
   <button class="nav-btn" onclick="nav('clientes')"><span>👥</span>Clientes</button>
   <button class="nav-btn" onclick="nav('historial')"><span>📊</span>Historial</button>
   <button class="nav-btn" onclick="nav('productos')"><span>📦</span>Productos</button>
   <button class="nav-btn" onclick="nav('resumen')"><span>📈</span>Resumen</button>
 </nav>
 
-<div class="toast" id="toast">✅ Acción completada</div>
+<div class="toast" id="toast">✅</div>
 
 <script>
-// === CONFIGURACIÓN ===
-const API_URL = 'https://script.google.com/macros/s/AKfycbz8ua_OAfeoCKo1FwWi_T22o5U5rrQfqW0IZ0_YLwj92aDFyP21Fql4KaTKKsKb8W79pw/exec';
-let carrito = JSON.parse(localStorage.getItem('lh_cart') || '[]');
-let pendingSales = JSON.parse(localStorage.getItem('lh_pending') || '[]');
-let productos = [];
-let clientes = JSON.parse(localStorage.getItem('lh_clients') || '[]');
-let ventaActual = null;
+// ═══════════════════════════════════════════════════
+// CONFIGURACIÓN - REEMPLAZA ESTA URL CON LA TUYA REAL
+// ═══════════════════════════════════════════════════
+const API_URL = 'https://script.google.com/macros/s/AKfycbzNY5A4Rls24akHueBkWLU7VFZ6DcFIkCJETe4Rdx13UUU47BYKF9yQ07fKctBXQUoF/exec';
 
-// === INIT ===
-async function init(){
-  renderCart();
-  renderPending();
-  await loadProductos();
-  await loadClientes();
-  if(navigator.onLine) syncPending();
-  window.addEventListener('online', syncPending);
-  
-  // Service Worker & PWA
-  if('serviceWorker' in navigator){
-    const sw = `self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>new Response('Offline'))));`;
-    const blob = new Blob([sw],{type:'application/javascript'});
-    navigator.serviceWorker.register(URL.createObjectURL(blob));
-  }
-}
+// Estado global
+let productos = [], clientes = [], carrito = [], pendingSales = JSON.parse(localStorage.getItem('lh_pending')||'[]'), ventaActual = null;
 
-// === API ===
-async function callAPI(accion, params={}) {
+// ═══════════════════════════════════════════════════
+// API: Función robusta para llamar a Apps Script
+// ═══════════════════════════════════════════════════
+async function callAPI(accion, params = {}) {
   let url = API_URL.trim();
   if (url.endsWith('/')) url = url.slice(0, -1);
-  
-  url += `?accion=${encodeURIComponent(accion)}`;
+  url += '?accion=' + encodeURIComponent(accion);
   for (const [k, v] of Object.entries(params)) {
-    url += `&${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
+    if (v !== undefined && v !== null) {
+      url += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(String(v));
+    }
   }
-  
-  console.log('🌐 Fetching:', url); // 👈 Mira esto en la consola del navegador
-  
+  console.log('🌐 Fetch:', url);
   const res = await fetch(url);
   const text = await res.text();
   try {
     const data = JSON.parse(text);
-    if (!data.success) throw new Error(data.error || 'Error desconocido');
+    if (data && data.success === false) throw new Error(data.error || 'Error del servidor');
     return data;
-  } catch(e) {
-    throw new Error(`Respuesta inválida: ${text}`);
+  } catch (e) {
+    console.error('❌ Parse error:', text);
+    throw new Error('Respuesta inválida: ' + (text||e.message).substring(0,150));
   }
 }
-  
-// === POS ===
-function updateProductSelect(){
+
+// ═══════════════════════════════════════════════════
+// DIAGNÓSTICO
+// ═══════════════════════════════════════════════════
+async function testGetProductos() {
+  const box = document.getElementById('resultado');
+  box.innerHTML = '<div style="color:var(--textMuted)">Probando getProductos...</div>';
+  try {
+    const data = await callAPI('getProductos');
+    productos = data.productos || [];
+    box.innerHTML = `<div class="success-box">✅ getProductos OK\n📦 ${productos.length} productos cargados\n\nPrimer producto:\n${JSON.stringify(productos[0]||{},null,2)}</div>`;
+    document.getElementById('btnIrPos').style.display = 'block';
+    document.getElementById('navPos').disabled = false;
+  } catch (e) {
+    box.innerHTML = `<div class="error-box">❌ Error: ${e.message}\n\n💡 Posibles causas:\n• URL incorrecta en API_URL\n• Apps Script no reimplementado\n• Acceso no es "Cualquier persona"\n• Bloqueador de anuncios/CORS</div>`;
+  }
+}
+
+async function testGetClientes() {
+  const box = document.getElementById('resultado');
+  box.innerHTML = '<div style="color:var(--textMuted)">Probando getClientes...</div>';
+  try {
+    const data = await callAPI('getClientes');
+    clientes = data.clientes || JSON.parse(localStorage.getItem('lh_clients')||'[]');
+    localStorage.setItem('lh_clients', JSON.stringify(clientes));
+    box.innerHTML = `<div class="success-box">✅ getClientes OK\n👥 ${clientes.length} clientes cargados</div>`;
+  } catch (e) {
+    box.innerHTML = `<div class="error-box">❌ Error: ${e.message}</div>`;
+  }
+}
+
+function copiarUrl() {
+  navigator.clipboard.writeText(API_URL);
+  toast('✅ URL copiada');
+}
+
+function irAPos() {
+  nav('pos');
+  initPOS();
+}
+
+// ═══════════════════════════════════════════════════
+// NAVEGACIÓN
+// ═══════════════════════════════════════════════════
+function nav(screen) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screen).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  if (screen === 'historial') renderHistorial();
+  if (screen === 'resumen' && ventaActual) renderResumen(ventaActual);
+}
+
+// ═══════════════════════════════════════════════════
+// POS: Lógica principal
+// ═══════════════════════════════════════════════════
+async function initPOS() {
+  renderCart();
+  await loadProductos();
+  await loadClientes();
+  if (navigator.onLine) await syncPending();
+  window.addEventListener('online', syncPending);
+}
+
+async function loadProductos() {
+  try {
+    const data = await callAPI('getProductos');
+    productos = data.productos || [];
+    renderProductos();
+    updateProductSelect();
+  } catch (e) {
+    console.warn('⚠️ Productos offline');
+    updateProductSelect();
+  }
+}
+
+async function loadClientes() {
+  try {
+    const data = await callAPI('getClientes');
+    clientes = data.clientes || clientes;
+    localStorage.setItem('lh_clients', JSON.stringify(clientes));
+  } catch (e) {}
+  renderClientes();
+  updateClientSelect();
+}
+
+function updateProductSelect() {
   const sel = document.getElementById('selProducto');
+  if (!productos.length) { sel.innerHTML = '<option value="">Sin productos</option>'; return; }
   sel.innerHTML = '<option value="">Seleccionar producto...</option>' + 
-    productos.map(p=>`<option value="${p.nombre}" data-precio="${p.precioBotella}" data-stock="${p.stock}">${p.nombre} ($${p.precioBotella}) [${p.stock}]</option>`).join('');
-  sel.onchange = ()=>{
+    productos.map(p => `<option value="${p.nombre}" data-precio="${p.precioBotella}" data-stock="${p.stock}">${p.nombre} ($${p.precioBotella}) [${p.stock}]</option>`).join('');
+  sel.onchange = () => {
     const opt = sel.options[sel.selectedIndex];
-    document.getElementById('txtPrecio').value = opt.dataset.precio || '';
+    document.getElementById('txtPrecio').value = opt?.dataset.precio || '';
   };
 }
 
-function updateClientSelect(){
+function updateClientSelect() {
   const sel = document.getElementById('selCliente');
   sel.innerHTML = '<option value="Mostrador">🏪 Mostrador (sin cliente)</option>' +
-    clientes.map(c=>`<option value="${c.negocio||''} - ${c.nombre} ${c.apellido}">${c.negocio||''} - ${c.nombre} ${c.apellido}</option>`).join('');
+    (clientes||[]).map(c => `<option value="${c.negocio||''} - ${c.nombre} ${c.apellido}">${c.negocio||''} - ${c.nombre} ${c.apellido}</option>`).join('');
 }
 
-function addToCart(){
+function addToCart() {
   const prod = document.getElementById('selProducto').value;
-  if(!prod) return toast('⚠️ Selecciona un producto');
-  const cant = parseInt(document.getElementById('txtCant').value)||1;
-  const precio = parseInt(document.getElementById('txtPrecio').value)||0;
-  const item = carrito.find(i=>i.nombre===prod);
-  if(item) item.cantidad += cant;
-  else carrito.push({nombre:prod, precio, cantidad:cant});
+  if (!prod) return toast('⚠️ Selecciona un producto');
+  const cant = parseInt(document.getElementById('txtCant').value) || 1;
+  const precio = parseInt(document.getElementById('txtPrecio').value) || 0;
+  const item = carrito.find(i => i.nombre === prod);
+  if (item) item.cantidad += cant;
+  else carrito.push({ nombre: prod, precio, cantidad: cant });
   saveCart(); renderCart();
-  document.getElementById('txtCant').value = 1;
+  document.getElementById('txtCant').value = '1';
   document.getElementById('selProducto').value = '';
   document.getElementById('txtPrecio').value = '';
   toast('✅ Agregado');
 }
 
-function renderCart(){
-  const view = document.getElementById('cartView');
-  const container = document.getElementById('cartItems');
-  if(carrito.length===0){view.style.display='none';return;}
-  view.style.display='block';
-  let total=0, html='';
-  carrito.forEach((c,i)=>{
-    const sub = c.precio*c.cantidad; total+=sub;
-    html+=`<div class="item-row"><div><span class="name">${c.nombre}</span><br><span class="detail">x${c.cantidad} × $${c.precio}</span></div><div><span class="price">$${sub}</span><span class="remove" onclick="removeFromCart(${i})">✕</span></div></div>`;
+function renderCart() {
+  const view = document.getElementById('cartView'), container = document.getElementById('cartItems');
+  if (!carrito.length) { view.style.display = 'none'; return; }
+  view.style.display = 'block';
+  let total = 0, html = '';
+  carrito.forEach((c, i) => {
+    const sub = c.precio * c.cantidad; total += sub;
+    html += `<div class="item-row"><div><span class="name">${c.nombre}</span><br><span class="detail">x${c.cantidad} × $${c.precio}</span></div><div><span class="price">$${sub}</span><span class="remove" onclick="removeFromCart(${i})">✕</span></div></div>`;
   });
-  container.innerHTML=html;
-  document.getElementById('cartTotal').textContent='$'+total;
+  container.innerHTML = html;
+  document.getElementById('cartTotal').textContent = '$' + total;
 }
 
-function removeFromCart(i){carrito.splice(i,1);saveCart();renderCart();}
-function saveCart(){localStorage.setItem('lh_cart',JSON.stringify(carrito));}
+function removeFromCart(i) { carrito.splice(i, 1); saveCart(); renderCart(); }
+function saveCart() { localStorage.setItem('lh_cart', JSON.stringify(carrito)); }
 
-function checkout(){
-  if(carrito.length===0) return toast('⚠️ Carrito vacío');
+function checkout() {
+  if (!carrito.length) return toast('⚠️ Carrito vacío');
   const pago = document.getElementById('selPago').value;
-  if(!pago) return toast('⚠️ Selecciona forma de pago');
+  if (!pago) return toast('⚠️ Selecciona forma de pago');
   const cliente = document.getElementById('selCliente').value || 'Mostrador';
-  const total = carrito.reduce((s,c)=>s+c.precio*c.cantidad,0);
-  
-  ventaActual = {fecha:new Date().toLocaleString('es-AR'), cliente, carrito:[...carrito], total, pago};
+  const total = carrito.reduce((s, c) => s + c.precio * c.cantidad, 0);
+  ventaActual = { fecha: new Date().toLocaleString('es-AR'), cliente, carrito: [...carrito], total, pago };
   guardarVentaOffline(ventaActual);
   renderResumen(ventaActual);
   nav('resumen');
-  carrito=[]; saveCart(); renderCart();
-  document.getElementById('selPago').value='';
+  carrito = []; saveCart(); renderCart();
+  document.getElementById('selPago').value = '';
   toast('✅ Venta registrada');
 }
 
-function guardarVentaOffline(venta){
-  pendingSales.push({...venta, status:'pending', timestamp:Date.now()});
+function guardarVentaOffline(venta) {
+  pendingSales.push({ ...venta, status: 'pending', timestamp: Date.now() });
   localStorage.setItem('lh_pending', JSON.stringify(pendingSales));
   syncPending();
 }
 
-async function syncPending(){
-  if(!navigator.onLine || pendingSales.length===0) return;
-  toast('🔄 Sincronizando ventas offline...');
+async function syncPending() {
+  if (!navigator.onLine || !pendingSales.length) return;
+  toast('🔄 Sincronizando...');
   const toSync = [...pendingSales];
   pendingSales = [];
   localStorage.setItem('lh_pending', JSON.stringify(pendingSales));
-  
-  for(const v of toSync){
-    try{
-      const params = {
-        productos: v.carrito.map(c=>c.nombre).join('|'),
-        precios: v.carrito.map(c=>c.precio).join('|'),
-        cantidades: v.carrito.map(c=>c.cantidad).join('|'),
+  for (const v of toSync) {
+    try {
+      await callAPI('guardarVenta', {
+        productos: v.carrito.map(c => c.nombre).join('|'),
+        precios: v.carrito.map(c => c.precio).join('|'),
+        cantidades: v.carrito.map(c => c.cantidad).join('|'),
         cliente: v.cliente,
         pago: v.pago
-      };
-      await callAPI('guardarVenta', params);
-      
-      // Actualizar stocks
-      await callAPI('actualizarStocks', {
-        nombres: params.productos,
-        cantidades: params.cantidades
       });
-    }catch(e){
-      pendingSales.push({...v, status:'error'});
-    }
+      await callAPI('actualizarStocks', {
+        nombres: v.carrito.map(c => c.nombre).join('|'),
+        cantidades: v.carrito.map(c => c.cantidad).join('|')
+      });
+    } catch (e) { pendingSales.push({ ...v, status: 'error' }); }
   }
   localStorage.setItem('lh_pending', JSON.stringify(pendingSales));
-  toast('✅ Sincronización completa');
+  toast('✅ Sincronizado');
 }
 
-// === CLIENTES ===
-function showClientForm(){document.getElementById('clientForm').style.display='block';}
-function hideClientForm(){document.getElementById('clientForm').style.display='none';}
-async function saveClient(){
-  const nom=document.getElementById('cliNom').value.trim();
-  const tel=document.getElementById('cliTel').value.trim();
-  if(!nom||!tel) return toast('⚠️ Nombre y teléfono son obligatorios');
+// ═══════════════════════════════════════════════════
+// CLIENTES
+// ═══════════════════════════════════════════════════
+function showClientForm() { document.getElementById('clientForm').style.display = 'block'; }
+function hideClientForm() { document.getElementById('clientForm').style.display = 'none'; }
+async function saveClient() {
+  const nom = document.getElementById('cliNom').value.trim(), tel = document.getElementById('cliTel').value.trim();
+  if (!nom || !tel) return toast('⚠️ Nombre y teléfono son obligatorios');
   const cli = {
-    id:'C'+Date.now(), nombre:nom, apellido:document.getElementById('cliApe').value.trim(),
-    negocio:document.getElementById('cliNeg').value.trim(), tipo:document.getElementById('cliTipo').value,
-    telefono:tel, direccion:document.getElementById('cliDir').value.trim(),
-    cuit:document.getElementById('cliCUIT').value.trim(), notas:document.getElementById('cliNotas').value.trim()
+    id: 'C' + Date.now(), nombre: nom, apellido: document.getElementById('cliApe').value.trim(),
+    negocio: document.getElementById('cliNeg').value.trim(), tipo: document.getElementById('cliTipo').value,
+    telefono: tel, direccion: document.getElementById('cliDir').value.trim(),
+    cuit: document.getElementById('cliCUIT').value.trim(), notas: document.getElementById('cliNotas').value.trim()
   };
-  try{ await callAPI('guardarCliente', cli); }catch(e){}
-  clientes.push(cli); localStorage.setItem('lh_clients',JSON.stringify(clientes));
+  try { await callAPI('guardarCliente', cli); } catch (e) {}
+  clientes.push(cli); localStorage.setItem('lh_clients', JSON.stringify(clientes));
   renderClientes(); updateClientSelect(); hideClientForm(); toast('✅ Cliente guardado');
-  ['cliNom','cliApe','cliNeg','cliTel','cliDir','cliCUIT','cliNotas'].forEach(id=>document.getElementById(id).value='');
+  ['cliNom','cliApe','cliNeg','cliTel','cliDir','cliCUIT','cliNotas'].forEach(id => document.getElementById(id).value = '');
 }
-
-function renderClientes(){
-  document.getElementById('clientsList').innerHTML = clientes.map(c=>`
+function renderClientes() {
+  document.getElementById('clientsList').innerHTML = (clientes||[]).map(c => `
     <div class="card">
       <div style="display:flex;justify-content:space-between"><span class="name">${c.nombre} ${c.apellido}</span><span class="badge">${c.tipo}</span></div>
       <div class="detail">${c.negocio||'Sin negocio'} | 📞 ${c.telefono}</div>
       <div class="detail">📍 ${c.direccion||'Sin dirección'} | 🆔 ${c.cuit||'Sin CUIT'}</div>
-      ${c.notas?`<div class="detail">📝 ${c.notas}</div>`:''}
+      ${c.notas ? `<div class="detail">📝 ${c.notas}</div>` : ''}
     </div>`).join('');
 }
 
-// === HISTORIAL ===
-async function renderHistorial(){
+// ═══════════════════════════════════════════════════
+// HISTORIAL
+// ═══════════════════════════════════════════════════
+async function renderHistorial() {
   document.getElementById('histList').innerHTML = '<div class="empty">Cargando...</div>';
-  try{
-    const res = await callAPI('getVentas');
-    document.getElementById('histList').innerHTML = res.ventas.map(v=>`
+  try {
+    const data = await callAPI('getVentas');
+    document.getElementById('histList').innerHTML = (data.ventas||[]).map(v => `
       <div class="card">
         <div style="display:flex;justify-content:space-between"><span class="name">${v.fecha}</span><span class="price">$${v.total}</span></div>
         <div class="detail">👤 ${v.cliente} | 💳 ${v.pago}</div>
         <div class="detail">${v.producto} x${v.cantidad}</div>
       </div>`).join('');
-  }catch(e){ document.getElementById('histList').innerHTML = '<div class="empty">No se pudo cargar. Verifica conexión.</div>'; }
+  } catch (e) { document.getElementById('histList').innerHTML = '<div class="empty">Sin conexión</div>'; }
 }
 
-// === PRODUCTOS ===
-function showProdForm(){document.getElementById('prodForm').style.display='block';}
-function hideProdForm(){document.getElementById('prodForm').style.display='none';}
-async function saveProduct(){
-  const nom=document.getElementById('prodNom').value.trim();
-  const pre=parseInt(document.getElementById('prodPre').value);
-  const sto=parseInt(document.getElementById('prodSto').value);
-  if(!nom||isNaN(pre)||isNaN(sto)) return toast('⚠️ Completá nombre, precio y stock');
-  try{
-    await callAPI('guardarProducto', {nombre:nom, estilo:document.getElementById('prodEst').value.trim(), precioBotella:pre, precioPack:pre*6, stock:sto});
-    await loadProductos(); hideProdForm(); toast('✅ Producto guardado');
-  }catch(e){toast('❌ Error al guardar');}
-  ['prodNom','prodEst','prodPre','prodSto'].forEach(id=>document.getElementById(id).value='');
-}
-
-function renderProductos(){
-  document.getElementById('prodList').innerHTML = productos.map(p=>`
+// ═══════════════════════════════════════════════════
+// PRODUCTOS
+// ═══════════════════════════════════════════════════
+function renderProductos() {
+  document.getElementById('prodList').innerHTML = productos.map(p => `
     <div class="item-row">
       <div><span class="name">${p.nombre}</span><br><span class="detail">${p.estilo||''}</span></div>
       <div style="text-align:right"><span class="price">$${p.precioBotella}</span><br><span class="badge ${p.stock<=5?'low':''}">Stock: ${p.stock}</span></div>
     </div>`).join('');
 }
 
-// === RESUMEN ===
-function renderResumen(v){
+// ═══════════════════════════════════════════════════
+// RESUMEN
+// ═══════════════════════════════════════════════════
+function renderResumen(v) {
   document.getElementById('ticketView').innerHTML = `
     <div class="card" style="font-size:12px;line-height:1.5;white-space:pre-wrap">
 🍺 *LOS HORCONES - CERVEZAS CUYANAS*
@@ -376,7 +436,7 @@ Las Heras, Mendoza
 👤 ${v.cliente}
 Fecha: ${v.fecha}
 ──────────────────
-${v.carrito.map(c=>`${c.nombre} x${c.cantidad} - $${c.precio}`).join('\n')}
+${v.carrito.map(c => `${c.nombre} x${c.cantidad} - $${c.precio}`).join('\n')}
 
 TOTAL: $ ${v.total}
 Pago: ${v.pago}
@@ -385,35 +445,30 @@ Pago: ${v.pago}
 ¡Gracias por elegirnos! 🍻
     </div>`;
 }
-
-function sendTicket(tipo){
+function sendTicket(tipo) {
   const msg = document.getElementById('ticketView').innerText;
-  const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-  window.open(url,'_blank');
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+}
+function newSale() { ventaActual = null; document.getElementById('ticketView').innerHTML = '<div class="empty">Nueva venta lista</div>'; nav('pos'); }
+
+// ═══════════════════════════════════════════════════
+// UTILIDADES
+// ═══════════════════════════════════════════════════
+function toast(msg) {
+  const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-function newSale(){
-  ventaActual=null;
-  document.getElementById('ticketView').innerHTML='<div class="empty">Nueva venta lista</div>';
-  nav('pos');
-}
-
-// === UI ===
-function nav(screen){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById(screen).classList.add('active');
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  event.currentTarget.classList.add('active');
-  if(screen==='historial') renderHistorial();
-  if(screen==='resumen' && ventaActual) renderResumen(ventaActual);
-}
-
-function toast(msg){
-  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),2500);
-}
-
+// ═══════════════════════════════════════════════════
+// INICIALIZACIÓN
+// ═══════════════════════════════════════════════════
+document.getElementById('apiUrlDisplay').value = API_URL;
+if (localStorage.getItem('lh_cart')) carrito = JSON.parse(localStorage.getItem('lh_cart'));
 init();
+async function init() {
+  if (document.getElementById('diagnostico').classList.contains('active')) return;
+  await initPOS();
+}
 </script>
 </body>
 </html>
